@@ -1,9 +1,8 @@
+import user from '@src/controllers/user.controllers'
 import { Router } from 'express'
 
-const router = Router()
+const userRoutes = Router()
 
-router.get('/', (_req, res) => {
-    res.json({ message: 'Liste des utilisateurs' })
-})
+userRoutes.get('/users', user.allUsers)
 
-export default router
+export default userRoutes

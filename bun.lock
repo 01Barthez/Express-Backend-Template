@@ -4,7 +4,7 @@
     "": {
       "name": "express-backend-template",
       "dependencies": {
-        "@prisma/client": "^6.8.1",
+        "@prisma/client": "^6.8.2",
         "aws-sdk": "^2.1692.0",
         "bcrypt": "^6.0.0",
         "compression": "^1.8.0",
@@ -33,6 +33,7 @@
         "rimraf": "^6.0.1",
         "swagger-jsdoc": "^6.2.8",
         "swagger-ui-express": "^5.0.1",
+        "typescript": "^5.8.3",
         "uuid": "^11.1.0",
         "winston": "^3.17.0",
         "winston-daily-rotate-file": "^5.0.0",
@@ -73,9 +74,6 @@
         "prettier": "^3.5.3",
         "ts-node-dev": "^2.0.0",
         "typescript-eslint": "^8.32.1",
-      },
-      "peerDependencies": {
-        "typescript": "^5.8.3",
       },
     },
   },
@@ -222,7 +220,7 @@
 
     "@pkgr/core": ["@pkgr/core@0.2.4", "", {}, "sha512-ROFF39F6ZrnzSUEmQQZUar0Jt4xVoP9WnDRdWwF4NNcXs3xBTLgBUDoOwW141y1jP+S8nahIbdxbFC7IShw9Iw=="],
 
-    "@prisma/client": ["@prisma/client@6.8.1", "", { "peerDependencies": { "prisma": "*", "typescript": ">=5.1.0" }, "optionalPeers": ["prisma", "typescript"] }, "sha512-OxkcBe9i/iQp4vNlXB2nRaTAIu3xtdshqKAUYenGve7MnT1YFsE2FOr92MMF2/5TuNTAJ1jGyls3t16YSfoOYA=="],
+    "@prisma/client": ["@prisma/client@6.8.2", "", { "peerDependencies": { "prisma": "*", "typescript": ">=5.1.0" }, "optionalPeers": ["prisma", "typescript"] }, "sha512-5II+vbyzv4si6Yunwgkj0qT/iY0zyspttoDrL3R4BYgLdp42/d2C8xdi9vqkrYtKt9H32oFIukvyw3Koz5JoDg=="],
 
     "@prisma/config": ["@prisma/config@6.8.1", "", { "dependencies": { "jiti": "2.4.2" } }, "sha512-8F8fPo32+L9pZ6iESJnFS/Q6R7jvKb5Bn8hsMcOYpkIRV4OQcdvCBQpLS60qol16F0TUAu2NXiE97a/hghex4Q=="],
 

@@ -1,0 +1,238 @@
+version: '3.9'
+
+services:
+    # Application Service from dockerfile
+    app:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        container_name: express_template
+        restart: unless-stopped
+        env_file: .env
+        environment:
+            - MONGO_URI=mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongodb:27017/${MONGO_DB}?authSource=admin
+            - REDIS_URI=redis://${REDIS_USERNAME}:${REDIS_PASSWORD}@redis:6379
+        ports:
+            - '${PORT:-3000}:80'
+        depends_on:
+            mongo:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+        networks:
+            - template-backend-network
+        healthcheck:
+            test: ['CMD', 'curl', '-f', 'http://localhost:3000/health']
+            interval: 30s
+            timeout: 5s
+            retries: 3
+            start_period: 10s
+
+    # Mongo DB service
+    mongo:
+        image: mongo:8.0.9
+        container_name: mongo_db_template_express
+        restart: unless-stopped
+        volumes:
+            - mongo_data:/data/db
+            - ./mongo-init:/docker-entrypoint-initdb.d
+        ports:
+            - '${MONGO_PORT:-27017}:27017'
+        networks:
+            - template-backend-network
+        environment:
+            - MONGO_INITDB_ROOT_USERNAME=${MONGO_USERNAME}
+            - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD}
+            - MONGO_INITDB_DATABASE=${MONGO_DB}
+        healthcheck:
+            test: echo 'db.runCommand("ping").ok' | mongosh mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@localhost:27017/admin --quiet
+            interval: 20s
+            timeout: 5s
+            retries: 5
+            start_period: 10s
+
+    # Redis service
+    redis:
+        image: redis:8.0.1-alpine
+        container_name: redis_cache_template_express
+        restart: unless-stopped
+        ports:
+            - '${REDIS_PORT:-6379}:6379'
+        networks:
+            - template-backend-network
+        volumes:
+            - redis_data:/data
+        healthcheck:
+            test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD}', 'ping']
+            interval: 30s
+            timeout: 10s
+            retries: 3
+
+    # NGINX Service
+    nginx:
+        image: nginx:1.27-alpine
+        container_name: nginx-template_express
+        restart: unless-stopped
+        ports:
+            - '${NGINX_HTTP_PORT:-80}:80'
+            - '${NGINX_HTTPS_PORT:-443}:443'
+        volumes:
+            - ./nginx.conf:/etc/nginx/nginx.conf:ro
+            - ./ssl:/etc/nginx/ssl:ro
+            - nginx_logs:/var/log/nginx
+            - ./static:/var/www/static:ro
+        depends_on:
+        app:
+            condition: service_healthy
+        networks:
+            - backend-network
+        healthcheck:
+        test: ['CMD', 'wget', '-qO-', 'http://localhost/health']
+        interval: 10s
+        timeout: 5s
+        retries: 3
+        start_period: 5s
+
+    # ADMINISTRATION TOOLS ##############################################################################################################################################################################
+
+    # Interface pour MongoDB
+    mongo-express:
+        image: mongo-express:latest
+        container_name: mongo-express
+        restart: unless-stopped
+        environment:
+            - ME_CONFIG_MONGODB_SERVER=mongodb
+            - ME_CONFIG_MONGODB_ADMINUSERNAME=${MONGO_USERNAME}
+            - ME_CONFIG_MONGODB_ADMINPASSWORD=${MONGO_PASSWORD}
+            - ME_CONFIG_BASICAUTH_USERNAME=${MONGO_EXPRESS_USERNAME:-admin}
+            - ME_CONFIG_BASICAUTH_PASSWORD=${MONGO_EXPRESS_PASSWORD:-password}
+        ports:
+            - '${MONGO_EXPRESS_PORT:-8081}:8081'
+        depends_on:
+        mongodb:
+            condition: service_healthy
+        networks:
+            - backend-network
+
+    # Interface pour Redis
+    redisinsight:
+        image: redislabs/redisinsight:latest
+        container_name: redisinsight
+        restart: unless-stopped
+        ports:
+            - '${REDIS_INSIGHT_PORT:-8001}:8001'
+        volumes:
+            - redisinsight_data:/db
+        depends_on:
+        redis:
+            condition: service_healthy
+        networks:
+            - backend-network
+
+    # Gestionnaire de proxy Nginx avec interface
+    nginx-proxy-manager:
+        image: 'jc21/nginx-proxy-manager:latest'
+        container_name: nginx-proxy-manager
+        restart: unless-stopped
+        ports:
+            - '${NPM_HTTP_PORT:-80}:80'
+            - '${NPM_HTTPS_PORT:-444}:443'
+            - '${NPM_ADMIN_PORT:-81}:81'
+        volumes:
+            - npm_data:/data
+            - npm_letsencrypt:/etc/letsencrypt
+        depends_on:
+            - app
+        networks:
+            - backend-network
+
+    # Web interface for containers
+    portainer:
+        image: portainer/portainer-ce:latest
+        container_name: portainer
+        restart: unless-stopped
+        ports:
+            - '9443:9443'
+            - '9000:9000'
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock
+            - portainer_data:/data
+        networks:
+            - backend-network
+
+    # Smalll alternativ to postman or insomnia
+    hoppscotch:
+        image: hoppscotch/hoppscotch:latest
+        container_name: hoppscotch
+        restart: unless-stopped
+        ports:
+            - '3001:3000'
+        networks:
+            - backend-network
+
+    # Test send of email free
+    maildev:
+        image: maildev/maildev
+        container_name: maildev
+        restart: unless-stopped
+        ports:
+            - '1080:1080' # Interface web
+            - '1025:1025' # SMTP
+        networks:
+            - backend-network
+
+    # Lignt Monitoring
+    cadvisor:
+        image: gcr.io/cadvisor/cadvisor:latest
+        container_name: cadvisor
+        restart: unless-stopped
+        ports:
+            - '8080:8080'
+        volumes:
+            - /:/rootfs:ro
+            - /var/run:/var/run:ro
+            - /sys:/sys:ro
+            - /var/lib/docker/:/var/lib/docker:ro
+        networks:
+            - backend-network
+
+    # Reverse proxy for container
+    traefik:
+        image: traefik:v2.10
+        container_name: traefik
+        restart: unless-stopped
+        ports:
+            - '80:80'
+            - '443:443'
+            - '8080:8080' # Dashboard
+        command:
+            - '--api.insecure=true'
+            - '--providers.docker=true'
+            - '--entrypoints.web.address=:80'
+            - '--entrypoints.websecure.address=:443'
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock
+        networks:
+            - backend-network
+
+# Définition des réseaux
+networks:
+    template-backend-network:
+        driver: bridge
+
+# Définition des volumes
+volumes:
+    mongo_data:
+        driver: local
+    redis_data:
+        driver: local
+    nginx_logs:
+        driver: local
+    redisinsight_data:
+        driver: local
+    npm_data:
+        driver: local
+    npm_letsencrypt:
+        driver: local
+    portainer_data:
+        driver: local,
